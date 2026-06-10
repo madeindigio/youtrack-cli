@@ -9,7 +9,8 @@
   },
   "scripts": {
     "start": "node src/cli.js",
-    "install": "bun link",
+    "install": "node scripts/link-install.js",
+    "link": "bun link",
     "check": "node --check src/cli.js && node --check src/config.js && node --check src/markdown.js && node --check src/youtrack.js && node --test"
   },
   "repository": {

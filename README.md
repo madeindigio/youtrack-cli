@@ -15,7 +15,7 @@ From a local copy of the repository:
 bun install
 ```
 
-The `install` script runs `bun link`, so `bun install` registers the `yt` and `youtrack-cli` binaries globally for your user. If you already have the dependencies installed and only want to relink the CLI, run:
+The `install` script runs `bun link` when you work from a local checkout, so `bun install` registers the `youtrack-cli` and `yt` binaries globally for your user. The hook is skipped for global installs from git or registry sources. If you already have the dependencies installed and only want to relink the CLI, run:
 
 ```bash
 bun run install
@@ -42,7 +42,7 @@ bun install -g git@github.com:madeindigio/youtrack-cli.git
 After installing, verify that the command is available:
 
 ```bash
-yt --help
+youtrack-cli --help
 ```
 
 ## Alternative local installation
@@ -56,7 +56,7 @@ bun link
 ## Configuration
 
 ```bash
-yt setup --url https://youtrack.example.com --token perm:...
+youtrack-cli setup --url https://youtrack.example.com --token perm:...
 ```
 
 The configuration is saved at:
@@ -67,7 +67,7 @@ The configuration is saved at:
 You can also use environment variables:
 
 ```bash
-YOUTRACK_URL=https://youtrack.example.com YOUTRACK_TOKEN=perm:... yt issues list
+YOUTRACK_URL=https://youtrack.example.com YOUTRACK_TOKEN=perm:... youtrack-cli issues list
 ```
 
 In PowerShell:
@@ -75,22 +75,22 @@ In PowerShell:
 ```powershell
 $env:YOUTRACK_URL="https://youtrack.example.com"
 $env:YOUTRACK_TOKEN="perm:..."
-yt issues list
+youtrack-cli issues list
 ```
 
 ## Main commands
 
 ```bash
-yt setup --url https://youtrack.example.com --token perm:...
-yt issues list --query "project: ABC #Unresolved" --limit 20
-yt issues get ABC-123 --dependencies --comments --json
-yt issues export ABC-123 --dependencies --comments --out ./exports
-yt issues apply ./exports/ABC-123.md
+youtrack-cli setup --url https://youtrack.example.com --token perm:...
+youtrack-cli issues list --query "project: ABC #Unresolved" --limit 20
+youtrack-cli issues get ABC-123 --dependencies --comments --json
+youtrack-cli issues export ABC-123 --dependencies --comments --out ./exports
+youtrack-cli issues apply ./exports/ABC-123.md
 
-yt kb list --query "project: ABC" --limit 20
-yt kb get 12-345 --json
-yt kb export 12-345 --out ./kb
-yt kb apply ./kb/12-345.md
+youtrack-cli kb list --query "project: ABC" --limit 20
+youtrack-cli kb get 12-345 --json
+youtrack-cli kb export 12-345 --out ./kb
+youtrack-cli kb apply ./kb/12-345.md
 ```
 
 ## Issue Markdown
@@ -113,7 +113,7 @@ customFields:
 Issue description.
 ```
 
-`yt issues apply` creates an issue if there is no `id`/`idReadable`, or edits the existing one if present. To create new issues from Markdown, include `project.shortName` in the frontmatter.
+`youtrack-cli issues apply` creates an issue if there is no `id`/`idReadable`, or edits the existing one if present. To create new issues from Markdown, include `project.shortName` in the frontmatter.
 
 ## API
 

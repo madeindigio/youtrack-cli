@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { realpathSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
@@ -234,6 +235,16 @@ Environment:
 `);
 }
 
+export function isEntrypointPath(argv1 = process.argv[1], moduleUrl = import.meta.url) {
+  if (!argv1) return false;
+
+  try {
+    return realpathSync(argv1) === realpathSync(fileURLToPath(moduleUrl));
+  } catch {
+    return fileURLToPath(moduleUrl) === argv1;
+  }
+}
+
 function isEntrypoint() {
-  return process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
+  return import.meta.main || isEntrypointPath();
 }
