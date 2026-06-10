@@ -1,8 +1,51 @@
 # youtrack-cli
 
-CLI de terminal para YouTrack compatible con Bun y Node.js. Permite leer issues, exportarlas a Markdown con dependencias, comentarios y metadatos en frontmatter YAML, importar Markdown para crear o editar issues, y leer/escribir artículos de Knowledge Base.
+CLI de terminal para YouTrack compatible con Bun y Node.js. Permite listar issues, exportarlas a Markdown con dependencias, comentarios y metadatos en frontmatter YAML, importar Markdown para crear o editar issues, y leer o escribir artículos de la base de conocimiento.
 
-## Instalación local
+## Requisitos
+
+- Bun o Node.js 18.17 o superior.
+- Un token permanente de YouTrack.
+
+## Instalación con Bun
+
+Desde una copia local del repositorio:
+
+```bash
+bun install
+```
+
+El script `install` ejecuta `bun link`, por lo que `bun install` registra los binarios `yt` y `youtrack-cli` de forma global para tu usuario. Si ya tenías las dependencias instaladas y solo quieres volver a enlazar el CLI, ejecuta:
+
+```bash
+bun run install
+```
+
+También puedes instalar el CLI directamente desde la URL del repositorio con Bun:
+
+```bash
+bun install -g git+https://github.com/madeindigio/youtrack-cli.git
+```
+
+Si prefieres usar la referencia corta de GitHub:
+
+```bash
+bun install -g github:madeindigio/youtrack-cli
+```
+
+Para repositorios privados o acceso por SSH:
+
+```bash
+bun install -g git@github.com:madeindigio/youtrack-cli.git
+```
+
+Después de instalar, comprueba que el comando está disponible:
+
+```bash
+yt --help
+```
+
+## Instalación local alternativa
 
 ```bash
 npm link
@@ -52,20 +95,20 @@ yt kb apply ./kb/12-345.md
 
 ## Markdown de issues
 
-El export genera un fichero con frontmatter YAML y cuerpo editable:
+La exportación genera un fichero con frontmatter YAML y cuerpo editable:
 
 ```markdown
 ---
 kind: issue
 idReadable: ABC-123
-summary: Example
+summary: Ejemplo
 project:
   shortName: ABC
 customFields:
   Priority: Major
 ---
 
-# ABC-123 Example
+# ABC-123 Ejemplo
 
 Descripción de la issue.
 ```
