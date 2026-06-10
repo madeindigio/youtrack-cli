@@ -1,0 +1,24 @@
+{
+  "name": "youtrack-cli",
+  "version": "0.1.0",
+  "description": "Terminal CLI for YouTrack issues, dependencies, markdown export/import, and knowledge base articles.",
+  "type": "module",
+  "bin": {
+    "youtrack-cli": "./src/cli.js",
+    "yt": "./src/cli.js"
+  },
+  "scripts": {
+    "start": "node src/cli.js",
+    "check": "node --check src/cli.js && node --check src/config.js && node --check src/markdown.js && node --check src/youtrack.js && node --test"
+  },
+  "engines": {
+    "node": ">=18.17"
+  },
+  "keywords": [
+    "youtrack",
+    "cli",
+    "markdown",
+    "bun"
+  ],
+  "license": "MIT"
+}
