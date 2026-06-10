@@ -1,76 +1,76 @@
 # youtrack-cli
 
-CLI de terminal para YouTrack compatible con Bun y Node.js. Permite listar issues, exportarlas a Markdown con dependencias, comentarios y metadatos en frontmatter YAML, importar Markdown para crear o editar issues, y leer o escribir artículos de la base de conocimiento.
+Terminal CLI for YouTrack compatible with Bun and Node.js. It can list issues, export them to Markdown with dependencies, comments, and YAML frontmatter metadata, import Markdown to create or edit issues, and read or write knowledge base articles.
 
-## Requisitos
+## Requirements
 
-- Bun o Node.js 18.17 o superior.
-- Un token permanente de YouTrack.
+- Bun or Node.js 18.17 or later.
+- A permanent YouTrack token.
 
-## Instalación con Bun
+## Installation with Bun
 
-Desde una copia local del repositorio:
+From a local copy of the repository:
 
 ```bash
 bun install
 ```
 
-El script `install` ejecuta `bun link`, por lo que `bun install` registra los binarios `yt` y `youtrack-cli` de forma global para tu usuario. Si ya tenías las dependencias instaladas y solo quieres volver a enlazar el CLI, ejecuta:
+The `install` script runs `bun link`, so `bun install` registers the `yt` and `youtrack-cli` binaries globally for your user. If you already have the dependencies installed and only want to relink the CLI, run:
 
 ```bash
 bun run install
 ```
 
-También puedes instalar el CLI directamente desde la URL del repositorio con Bun:
+You can also install the CLI directly from the repository URL with Bun:
 
 ```bash
 bun install -g git+https://github.com/madeindigio/youtrack-cli.git
 ```
 
-Si prefieres usar la referencia corta de GitHub:
+If you prefer the short GitHub reference:
 
 ```bash
 bun install -g github:madeindigio/youtrack-cli
 ```
 
-Para repositorios privados o acceso por SSH:
+For private repositories or SSH access:
 
 ```bash
 bun install -g git@github.com:madeindigio/youtrack-cli.git
 ```
 
-Después de instalar, comprueba que el comando está disponible:
+After installing, verify that the command is available:
 
 ```bash
 yt --help
 ```
 
-## Instalación local alternativa
+## Alternative local installation
 
 ```bash
 npm link
-# o
+# or
 bun link
 ```
 
-## Configuración
+## Configuration
 
 ```bash
 yt setup --url https://youtrack.example.com --token perm:...
 ```
 
-La configuración se guarda en:
+The configuration is saved at:
 
-- Linux/macOS: `~/.config/youtrack-cli/config.yaml`, o `$XDG_CONFIG_HOME/youtrack-cli/config.yaml`
+- Linux/macOS: `~/.config/youtrack-cli/config.yaml`, or `$XDG_CONFIG_HOME/youtrack-cli/config.yaml`
 - Windows: `%APPDATA%\youtrack-cli\config.yaml`
 
-También puedes usar variables de entorno:
+You can also use environment variables:
 
 ```bash
 YOUTRACK_URL=https://youtrack.example.com YOUTRACK_TOKEN=perm:... yt issues list
 ```
 
-En PowerShell:
+In PowerShell:
 
 ```powershell
 $env:YOUTRACK_URL="https://youtrack.example.com"
@@ -78,7 +78,7 @@ $env:YOUTRACK_TOKEN="perm:..."
 yt issues list
 ```
 
-## Comandos principales
+## Main commands
 
 ```bash
 yt setup --url https://youtrack.example.com --token perm:...
@@ -93,28 +93,28 @@ yt kb export 12-345 --out ./kb
 yt kb apply ./kb/12-345.md
 ```
 
-## Markdown de issues
+## Issue Markdown
 
-La exportación genera un fichero con frontmatter YAML y cuerpo editable:
+The export generates a file with YAML frontmatter and an editable body:
 
 ```markdown
 ---
 kind: issue
 idReadable: ABC-123
-summary: Ejemplo
+summary: Example
 project:
   shortName: ABC
 customFields:
   Priority: Major
 ---
 
-# ABC-123 Ejemplo
+# ABC-123 Example
 
-Descripción de la issue.
+Issue description.
 ```
 
-`yt issues apply` crea una issue si no hay `id`/`idReadable`, o edita la existente si los hay. Para crear issues nuevas desde Markdown, incluye `project.shortName` en el frontmatter.
+`yt issues apply` creates an issue if there is no `id`/`idReadable`, or edits the existing one if present. To create new issues from Markdown, include `project.shortName` in the frontmatter.
 
 ## API
 
-Usa la REST API JSON de YouTrack (`/api/...`) con token permanente en `Authorization: Bearer ...`.
+Use YouTrack's JSON REST API (`/api/...`) with a permanent token in `Authorization: Bearer ...`.
