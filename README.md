@@ -1,6 +1,6 @@
 # youtrack-cli
 
-Terminal CLI for YouTrack compatible with Bun and Node.js. It can list issues, export them to Markdown with dependencies, comments, and YAML frontmatter metadata, import Markdown to create or edit issues, and read or write knowledge base articles.
+Terminal CLI for YouTrack compatible with Bun and Node.js. It can list issues, export them to Markdown with dependencies, comments, and YAML frontmatter metadata, import Markdown to create or edit issues, read or write knowledge base articles, and download the full history of a project (issues, comments, activities and attachments) through an internal file-backed job queue.
 
 ## Requirements
 
@@ -91,7 +91,99 @@ youtrack-cli kb list --query "project: ABC" --limit 20
 youtrack-cli kb get 12-345 --json
 youtrack-cli kb export 12-345 --out ./kb
 youtrack-cli kb apply ./kb/12-345.md
+
+youtrack-cli project export ABC --out ./ABC --concurrency 4 --rate 5
+youtrack-cli project status --out ./ABC
 ```
+
+## Full project export
+
+`project export` downloads the complete history of a project into a directory:
+
+```bash
+youtrack-cli project export ABC
+youtrack-cli project export ABC --out ./dumps/ABC --articles --since 2024-01-01
+```
+
+It downloads, for every issue of the project:
+
+- the raw issue payload and a Markdown rendering of it,
+- the comments,
+- the full activity history (every cursor page concatenated),
+- the links to other issues (part of the issue payload),
+- every binary attachment.
+
+With `--articles` it also downloads the knowledge-base articles of the project.
+
+### Output layout
+
+```
+<out>/
+  export.json                     manifest: project, options, counts, timestamps
+  .yt-export/
+    queue.db | queue.jsonl        persistent job queue
+    queue.lock                    single-coordinator lock
+  issues/
+    ABC-123/
+      issue.md                    Markdown export
+      issue.json                  raw API payload
+      comments.json
+      activities.json
+      assets/<attachmentId>__<name>
+  articles/
+    <ARTICLE-ID>/article.md, article.json, assets/...
+```
+
+### Queue and resume behaviour
+
+Every remote call is scheduled through an embedded, file-backed job queue stored
+in `<out>/.yt-export`. The queue uses SQLite when the runtime provides it
+(`bun:sqlite`, or `node:sqlite` on Node 22.5+) and falls back to a pure-JS
+append-only journal otherwise. There is no external broker and no extra
+dependency.
+
+- Interrupting an export and rerunning it with the same `--out` **resumes** the
+  same run: jobs that already finished are not repeated.
+- Rerunning a *completed* export starts a new run and re-indexes the project, so
+  new and updated issues are picked up. It stays cheap because attachments
+  already on disk with the expected size are skipped. The run number is recorded
+  in `<out>/.yt-export/run.json` and reported in `export.json`.
+- Only **one process may coordinate a given export directory**. The lock file
+  `<out>/.yt-export/queue.lock` records the owning pid; a second process fails
+  with a clear error. A lock left behind by a dead process is detected as stale
+  and taken over automatically; use `--force` to break a lock on purpose.
+- `--fresh` discards the previous queue state and starts the export over.
+- Interrupting the run with Ctrl-C stops the workers cleanly, releases the lock
+  and leaves the queue resumable.
+- Failed jobs are retried with exponential backoff. When jobs remain failed at
+  the end of the run, the CLI prints them to stderr and exits with status 1.
+
+`project status` inspects an export directory without taking the coordinator
+lock, so it is safe to run while an export is in progress:
+
+```bash
+youtrack-cli project status --out ./ABC
+youtrack-cli project status ABC --json
+```
+
+### Throttling flags
+
+| Flag | Default | Meaning |
+| --- | --- | --- |
+| `--rate <req/s>` | `5` | Maximum outgoing requests per second (accepts fractions, e.g. `0.5`). |
+| `--concurrency <n>` | `4` | Number of in-process workers consuming the queue. |
+| `--limit <n>` | none | Stop after indexing this many issues. |
+| `--since <date>` | none | Only issues updated since this date. |
+| `--no-attachments` | off | Skip binary attachment downloads. |
+| `--no-activities` | off | Skip the activity history. |
+| `--articles` | off | Also export the knowledge-base articles of the project. |
+| `--fresh` | off | Discard the previous queue state. |
+| `--force` | off | Take over an existing coordinator lock. |
+| `--json` | off | Print only the JSON summary on stdout. |
+
+Requests are rate limited by a token bucket and retried on `429` and `5xx`
+responses, honouring the `Retry-After` header, so the YouTrack server is never
+saturated.
 
 ## Issue Markdown
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { realpathSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { configPath, loadConfig, requireConfig, saveConfig } from "./config.js";
@@ -11,9 +11,15 @@ import {
   markdownToIssuePayload,
   parseMarkdownDocument,
 } from "./markdown.js";
+import { createPaths, createStderrLogger, exportProject } from "./project-export.js";
+import { openQueue } from "./queue.js";
 import { articleWebUrl, issueWebUrl, YouTrackClient } from "./youtrack.js";
 
 const args = process.argv.slice(2);
+
+const PROJECT_EXPORT_USAGE =
+  "Usage: yt project export <projectKey> [--out <dir>] [--concurrency <n>] [--rate <req/s>] " +
+  "[--no-attachments] [--no-activities] [--articles] [--since <date>] [--limit <n>] [--fresh] [--force] [--json]";
 
 if (isEntrypoint()) {
   main(args).catch((error) => {
@@ -32,6 +38,11 @@ async function main(argv) {
 
   const config = await loadConfig();
   requireConfig(config);
+
+  // The project command builds its own client because the request rate is a
+  // CLI option and is only known once the subcommand has been resolved.
+  if (command === "project") return project(config, subcommand, rest, options);
+
   const client = new YouTrackClient(config);
 
   if (command === "issues") return issues(client, config, subcommand, rest, options);
@@ -113,6 +124,122 @@ async function kb(client, config, subcommand, rest, options) {
   }
 
   throw new Error(`Unknown kb command: ${subcommand || ""}`);
+}
+
+async function project(config, subcommand, rest, options) {
+  if (subcommand === "export") return projectExport(config, rest[0], options);
+  if (subcommand === "status") return projectStatus(rest[0], options);
+  throw new Error(`Unknown project command: ${subcommand || ""}`);
+}
+
+/**
+ * Normalizes the raw `parseArgs` output of `yt project export` into the option
+ * object consumed by `exportProject`. Exported for testing.
+ * @param {string} projectKey
+ * @param {object} [options] Raw parsed CLI options.
+ */
+export function projectExportOptions(projectKey, options = {}) {
+  if (!projectKey || projectKey === true) throw new Error(PROJECT_EXPORT_USAGE);
+
+  const project = String(projectKey);
+  return {
+    project,
+    out: stringOption(options.out, "out") || `./${sanitizeFilename(project)}`,
+    concurrency: numberOption(options.concurrency, "concurrency", { fallback: 4, integer: true }),
+    rate: numberOption(options.rate, "rate", { fallback: 5 }),
+    attachments: !options.noAttachments,
+    activities: !options.noActivities,
+    articles: Boolean(options.articles),
+    since: stringOption(options.since, "since"),
+    limit: numberOption(options.limit, "limit", { integer: true }),
+    fresh: Boolean(options.fresh),
+    force: Boolean(options.force),
+    json: Boolean(options.json),
+  };
+}
+
+/**
+ * Resolves the export directory inspected by `yt project status`.
+ * @param {string} [projectKey] Optional project key positional.
+ * @param {object} [options] Raw parsed CLI options.
+ */
+export function projectStatusOptions(projectKey, options = {}) {
+  const out = stringOption(options.out, "out");
+  if (out) return { out, json: Boolean(options.json) };
+  if (projectKey && projectKey !== true) return { out: `./${sanitizeFilename(String(projectKey))}`, json: Boolean(options.json) };
+  throw new Error("Usage: yt project status [<projectKey>] [--out <dir>] [--json]");
+}
+
+async function projectExport(config, projectKey, options) {
+  const { project, out, ...exportOptions } = projectExportOptions(projectKey, options);
+  const client = new YouTrackClient({ ...config, rate: exportOptions.rate });
+  const logger = createStderrLogger({ silent: exportOptions.json });
+
+  const summary = await exportProject({ client, config, project, out, options: exportOptions, logger });
+
+  if (exportOptions.json) printJson(summary);
+  else printExportSummary(summary);
+
+  if (summary.failed > 0) {
+    process.exitCode = 1;
+    console.error(`${summary.failed} job(s) failed:`);
+    for (const job of summary.failedJobs) console.error(`  ${job.type} ${job.key}: ${job.error || "unknown error"}`);
+  }
+}
+
+async function projectStatus(projectKey, options) {
+  const { out, json } = projectStatusOptions(projectKey, options);
+  const paths = createPaths(out);
+  if (!(await exists(paths.meta))) {
+    throw new Error(`No export queue found at ${paths.meta}. Run "yt project export <projectKey> --out ${out}" first.`);
+  }
+
+  const queue = await openQueue(paths.meta, { backend: options.backend || "auto" });
+  try {
+    const stats = await queue.stats();
+    const failedJobs = await queue.listFailed(50);
+    if (json) {
+      return printJson({ out: paths.root, backend: queue.backend, stats, failedJobs });
+    }
+    console.log(`Export directory: ${paths.root}`);
+    console.log(`Queue backend:    ${queue.backend}`);
+    console.log(`pending=${stats.pending} running=${stats.running} done=${stats.done} failed=${stats.failed} total=${stats.total}`);
+    for (const job of failedJobs) console.log(`failed  ${job.type} ${job.key}: ${job.error || "unknown error"}`);
+  } finally {
+    await queue.close();
+  }
+}
+
+function printExportSummary(summary) {
+  const { counts, stats } = summary;
+  console.log(summary.out);
+  console.log(`issues=${counts.issues || 0} comments=${counts.comments || 0} activities=${counts.activities || 0} assets=${counts.assets || 0} articles=${counts.articles || 0}`);
+  console.log(`jobs done=${stats.done} failed=${stats.failed} pending=${stats.pending}`);
+  console.log(`manifest: ${summary.manifest}`);
+}
+
+async function exists(path) {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function stringOption(value, name) {
+  if (value === undefined) return undefined;
+  if (value === true) throw new Error(`Option --${name} requires a value`);
+  return String(value);
+}
+
+function numberOption(value, name, { fallback, integer = false } = {}) {
+  if (value === undefined) return fallback;
+  if (value === true) throw new Error(`Option --${name} requires a number`);
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) throw new Error(`Option --${name} must be a positive number, got "${value}"`);
+  if (integer && !Number.isInteger(number)) throw new Error(`Option --${name} must be an integer, got "${value}"`);
+  return number;
 }
 
 async function exportIssue(client, config, id, options) {
@@ -229,6 +356,17 @@ Usage:
   yt kb get <article-id> [--json]
   yt kb export <article-id> [--out <dir>]
   yt kb apply <file.md> [--id <article-id>]
+  yt project export <projectKey> [--out <dir>] [--concurrency <n>] [--rate <req/s>]
+                                 [--no-attachments] [--no-activities] [--articles]
+                                 [--since <date>] [--limit <n>] [--fresh] [--force] [--json]
+  yt project status [<projectKey>] [--out <dir>] [--json]
+
+Project export:
+  Downloads the whole project history (issues, comments, activities, links and
+  binary attachments) into <dir>, defaulting to ./<projectKey>. Work is scheduled
+  through a file-backed queue in <dir>/.yt-export, so rerunning the same command
+  resumes where it stopped. Only one process may coordinate a given directory;
+  use --force to take over a stale lock and --fresh to restart from scratch.
 
 Environment:
   YOUTRACK_URL, YOUTRACK_TOKEN, YOUTRACK_CONFIG
